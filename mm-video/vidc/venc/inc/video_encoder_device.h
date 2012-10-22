@@ -34,10 +34,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "qc_omx_component.h"
 #include "omx_video_common.h"
 #include <linux/msm_vidc_enc.h>
-#include <pthread.h>
-#include <linux/videodev2.h>
-#include <poll.h>
-#define TIMEOUT 5000
+
 #define MAX_RECON_BUFFERS 4
 
 void* async_venc_message_thread (void *);
@@ -45,7 +42,7 @@ void* async_venc_message_thread (void *);
 class venc_dev
 {
 public:
-  venc_dev(class omx_venc *venc_class); //constructor
+  venc_dev(); //constructor
   ~venc_dev(); //des
 
   bool venc_open(OMX_U32);
@@ -58,12 +55,10 @@ public:
   bool venc_set_meta_mode(bool);
 #endif
   unsigned venc_resume(void);
-  unsigned venc_start_done(void);
-  unsigned venc_stop_done(void);
-  bool venc_use_buf(void*, unsigned,unsigned);
+  bool venc_use_buf(void*, unsigned);
   bool venc_free_buf(void*, unsigned);
-  bool venc_empty_buf(void *, void *,unsigned,unsigned);
-  bool venc_fill_buf(void *, void *,unsigned,unsigned);
+  bool venc_empty_buf(void *, void *);
+  bool venc_fill_buf(void *, void *);
 
   bool venc_get_buf_req(unsigned long *,unsigned long *,
                         unsigned long *,unsigned long);
@@ -73,17 +68,9 @@ public:
   bool venc_set_config(void *configData, OMX_INDEXTYPE index);
   bool venc_get_profile_level(OMX_U32 *eProfile,OMX_U32 *eLevel);
   bool venc_max_allowed_bitrate_check(OMX_U32 nTargetBitrate);
-  bool venc_get_seq_hdr(void *, unsigned, unsigned *);
-  bool venc_loaded_start(void);
-  bool venc_loaded_stop(void);
-  bool venc_loaded_start_done(void);
-  bool venc_loaded_stop_done(void);
   OMX_U32 m_nDriver_fd;
   bool m_profile_set;
   bool m_level_set;
-  pthread_mutex_t loaded_start_stop_mlock;
-  pthread_cond_t loaded_start_stop_cond;
-
   struct recon_buffer {
 	  unsigned char* virtual_address;
 	  int pmem_fd;
@@ -102,7 +89,7 @@ public:
   bool m_max_allowed_bitrate_check;
   int m_eProfile;
   int m_eLevel;
-  int etb_count;
+
 private:
   struct venc_basecfg             m_sVenc_cfg;
   struct venc_ratectrlcfg         rate_ctrl;
@@ -121,7 +108,6 @@ private:
   struct venc_intrarefresh        intra_refresh;
   struct venc_headerextension     hec;
   struct venc_voptimingcfg        voptimecfg;
-  struct venc_seqheader           seqhdr;
 
   bool venc_set_profile_level(OMX_U32 eProfile,OMX_U32 eLevel);
   bool venc_set_intra_period(OMX_U32 nPFrames, OMX_U32 nBFrames);
@@ -140,7 +126,6 @@ private:
   bool venc_set_error_resilience(OMX_VIDEO_PARAM_ERRORCORRECTIONTYPE* error_resilience);
   bool venc_set_voptiming_cfg(OMX_U32 nTimeIncRes);
   void venc_config_print();
-  bool venc_set_slice_delivery_mode(OMX_BOOL enable);
 #ifdef MAX_RES_1080P
   OMX_U32 pmem_free();
   OMX_U32 pmem_allocate(OMX_U32 size, OMX_U32 alignment, OMX_U32 count);

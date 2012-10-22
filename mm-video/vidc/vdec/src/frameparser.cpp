@@ -25,25 +25,9 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --------------------------------------------------------------------------*/
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <stdarg.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <ctype.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/time.h>
-#include <sys/poll.h>
-#include <stdint.h>
-
 #include "frameparser.h"
 #include "omx_vdec.h"
+#include <string.h>
 
 #ifdef _ANDROID_
     extern "C"{

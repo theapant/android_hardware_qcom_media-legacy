@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MP4_UTILS_H
 #define MP4_UTILS_H
 #include "OMX_Core.h"
-#include "OMX_QCOMExtns.h"
 typedef signed long long int64;
 typedef unsigned long int uint32;   /* Unsigned 32 bit value */
 typedef unsigned short uint16;   /* Unsigned 16 bit value */
@@ -69,7 +68,6 @@ typedef unsigned char byte;   /* Unsigned 8  bit value type. */
 #define VIDEO_OBJECT_LAYER_START_CODE       0x00000120
 #define VOP_START_CODE_MASK                 0xFFFFFFFF
 #define VOP_START_CODE                      0x000001B6
-#define GOV_START_CODE                      0x000001B3
 #define SHORT_HEADER_MASK                   0xFFFFFC00
 #define SHORT_HEADER_START_MARKER           0x00008000
 #define SHORT_HEADER_START_CODE             0x00008000
@@ -146,6 +144,7 @@ typedef struct
   uint32    size;
   VOP_TYPE  vopType;
 } mp4_frame_info_type;
+
 
 class MP4_Utils {
 private:

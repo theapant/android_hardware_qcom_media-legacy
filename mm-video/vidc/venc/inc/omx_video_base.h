@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -41,8 +41,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                             Include Files
 //////////////////////////////////////////////////////////////////////////////
 
-#define LOG_TAG "OMX-VENC-720p"
-#include <stdlib.h>
+#include<stdlib.h>
 #include <stdio.h>
 #include <sys/mman.h>
 #ifdef _ANDROID_
@@ -59,7 +58,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "qc_omx_component.h"
 #include "omx_video_common.h"
 #include "extra_data_handler.h"
-#include <linux/videodev2.h>
 
 #ifdef _ANDROID_
 using namespace android;
@@ -72,13 +70,14 @@ public:
 };
 
 #include <utils/Log.h>
+#define ALOG_TAG "OMX-VENC-720p"
 #ifdef ENABLE_DEBUG_LOW
-#define DEBUG_PRINT_LOW ALOGV
+#define DEBUG_PRINT_LOW ALOGE
 #else
 #define DEBUG_PRINT_LOW
 #endif
 #ifdef ENABLE_DEBUG_HIGH
-#define DEBUG_PRINT_HIGH  ALOGV
+#define DEBUG_PRINT_HIGH ALOGE
 #else
 #define DEBUG_PRINT_HIGH
 #endif
@@ -94,19 +93,9 @@ public:
 #define DEBUG_PRINT_ERROR
 #endif // _ANDROID_
 
-#ifdef _MSM8974_
-#define DEBUG_PRINT_LOW
-#define DEBUG_PRINT_HIGH printf
-#define DEBUG_PRINT_ERROR printf
-#endif
-
 #ifdef USE_ION
     static const char* MEM_DEVICE = "/dev/ion";
-    #ifdef MAX_RES_720P
-    #define MEM_HEAP_ID ION_CAMERA_HEAP_ID
-    #else
     #define MEM_HEAP_ID ION_CP_MM_HEAP_ID
-    #endif
 #elif MAX_RES_720P
 static const char* MEM_DEVICE = "/dev/pmem_adsp";
 #elif MAX_RES_1080P_EBI
@@ -133,7 +122,7 @@ static const char* MEM_DEVICE = "/dev/pmem_smipool";
                        (unsigned)((OMX_BUFFERHEADERTYPE *)bufHdr)->nFilledLen,\
                        (unsigned)((OMX_BUFFERHEADERTYPE *)bufHdr)->nTimeStamp)
 
-// BitMask Management logic
+// BitMask Management AALOGIc
 #define BITS_PER_BYTE        32
 #define BITMASK_SIZE(mIndex) (((mIndex) + BITS_PER_BYTE - 1)/BITS_PER_BYTE)
 #define BITMASK_OFFSET(mIndex) ((mIndex)/BITS_PER_BYTE)
@@ -159,7 +148,6 @@ class omx_video: public qc_omx_component
 {
 protected:
 #ifdef _ANDROID_ICS_
-  bool get_syntaxhdr_enable;
   bool meta_mode_enable;
   encoder_media_buffer_type meta_buffers[MAX_NUM_INPUT_BUFFERS];
   OMX_BUFFERHEADERTYPE meta_buffer_hdr[MAX_NUM_INPUT_BUFFERS];
@@ -190,18 +178,11 @@ public:
   virtual OMX_U32 dev_start(void) = 0;
   virtual OMX_U32 dev_flush(unsigned) = 0;
   virtual OMX_U32 dev_resume(void) = 0;
-  virtual OMX_U32 dev_start_done(void) = 0;
-  virtual OMX_U32 dev_stop_done(void) = 0;
-  virtual bool dev_use_buf(void *,unsigned,unsigned) = 0;
+  virtual bool dev_use_buf(void *,unsigned) = 0;
   virtual bool dev_free_buf(void *,unsigned) = 0;
-  virtual bool dev_empty_buf(void *, void *,unsigned,unsigned) = 0;
-  virtual bool dev_fill_buf(void *buffer, void *,unsigned,unsigned) = 0;
+  virtual bool dev_empty_buf(void *, void *) = 0;
+  virtual bool dev_fill_buf(void *buffer, void *) = 0;
   virtual bool dev_get_buf_req(OMX_U32 *,OMX_U32 *,OMX_U32 *,OMX_U32) = 0;
-  virtual bool dev_get_seq_hdr(void *, unsigned, unsigned *) = 0;
-  virtual bool dev_loaded_start(void) = 0;
-  virtual bool dev_loaded_stop(void) = 0;
-  virtual bool dev_loaded_start_done(void) = 0;
-  virtual bool dev_loaded_stop_done(void) = 0;
 #ifdef _ANDROID_ICS_
   void omx_release_meta_buffer(OMX_BUFFERHEADERTYPE *buffer);
 #endif
@@ -345,9 +326,7 @@ public:
     OMX_COMPONENT_OUTPUT_FLUSH_PENDING    =0x9,
     OMX_COMPONENT_INPUT_FLUSH_PENDING    =0xA,
     OMX_COMPONENT_PAUSE_PENDING          =0xB,
-    OMX_COMPONENT_EXECUTE_PENDING        =0xC,
-    OMX_COMPONENT_LOADED_START_PENDING = 0xD,
-    OMX_COMPONENT_LOADED_STOP_PENDING = 0xF,
+    OMX_COMPONENT_EXECUTE_PENDING        =0xC
 
   };
 
@@ -562,7 +541,7 @@ public:
 private:
 #ifdef USE_ION
   int alloc_map_ion_memory(int size,struct ion_allocation_data *alloc_data,
-                                    struct ion_fd_data *fd_data,int flag);
+                                    struct ion_fd_data *fd_data);
   void free_ion_memory(struct venc_ion *buf_ion_info);
 #endif
 };

@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -40,15 +40,22 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                             Include Files
 //////////////////////////////////////////////////////////////////////////////
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <inttypes.h>
-#include <cstddef>
+#include<stdlib.h>
 
-static ptrdiff_t x;
+#include <stdio.h>
+#include <inttypes.h>
 
 #ifdef _ANDROID_
+#ifdef USE_ION
+#include <linux/ion.h>
+#include <binder/MemoryHeapIon.h>
+#else
+#include <binder/MemoryHeapBase.h>
+#endif
+#include "android_native_buffer.h"
+extern "C"{
+#include<utils/Log.h>
+}
 #ifdef MAX_RES_720P
 #define LOG_TAG "OMX-VDEC-720P"
 #elif MAX_RES_1080P
@@ -56,21 +63,6 @@ static ptrdiff_t x;
 #else
 #define LOG_TAG "OMX-VDEC"
 #endif
-
-#ifdef USE_ION
-#include <linux/ion.h>
-//#include <linux/ion.h> //TBD - uncomment this
-//#include <binder/MemoryHeapIon.h>
-//#else
-#endif
-#include <binder/MemoryHeapBase.h>
-#include <ui/ANativeObjectBase.h>
-extern "C"{
-#include <utils/Log.h>
-}
-#include <linux/videodev2.h>
-#include <poll.h>
-#define TIMEOUT 5000
 #ifdef ENABLE_DEBUG_LOW
 #define DEBUG_PRINT_LOW ALOGE
 #else
@@ -93,17 +85,9 @@ extern "C"{
 #define DEBUG_PRINT_ERROR printf
 #endif // _ANDROID_
 
-#ifdef _MSM8974_
-#define DEBUG_PRINT_LOW
-#define DEBUG_PRINT_HIGH printf
-#define DEBUG_PRINT_ERROR printf
-#endif
-
 #if defined (_ANDROID_HONEYCOMB_) || defined (_ANDROID_ICS_)
-#include <media/hardware/HardwareAPI.h>
+#include "HardwareAPI.h"
 #endif
-
-#include <unistd.h>
 
 #if defined (_ANDROID_ICS_)
 #include <gralloc_priv.h>
@@ -132,16 +116,13 @@ extern "C" {
 #ifdef _ANDROID_
     using namespace android;
 #ifdef USE_ION
-    class VideoHeap : public MemoryHeapBase
+    class VideoHeap : public MemoryHeapIon
     {
     public:
         VideoHeap(int devicefd, size_t size, void* base,struct ion_handle *handle,int mapfd);
         virtual ~VideoHeap() {}
-    private:
-       int m_ion_device_fd;
-       struct ion_handle *m_ion_handle;
     };
-#else 
+#else
     // local pmem heap object
     class VideoHeap : public MemoryHeapBase
     {
@@ -166,7 +147,7 @@ extern "C" {
                        (unsigned)((OMX_BUFFERHEADERTYPE *)bufHdr)->nFilledLen,\
                        (unsigned)((OMX_BUFFERHEADERTYPE *)bufHdr)->nTimeStamp)
 
-// BitMask Management logic
+// BitMask Management ALOGIc
 #define BITS_PER_BYTE        32
 #define BITMASK_SIZE(mIndex) (((mIndex) + BITS_PER_BYTE - 1)/BITS_PER_BYTE)
 #define BITMASK_OFFSET(mIndex) ((mIndex)/BITS_PER_BYTE)
@@ -388,6 +369,7 @@ public:
                                 OMX_PTR              appData,
                                 void *               eglImage);
     void complete_pending_buffer_done_cbs();
+
     struct video_driver_context drv_ctx;
     int  m_pipe_in;
     int  m_pipe_out;
@@ -464,15 +446,6 @@ private:
         VC1_SP_MP_RCV = 1,
         VC1_AP = 2
     };
-
-#ifdef _MSM8974_
-    enum v4l2_ports
-    {
-        CAPTURE_PORT,
-        OUTPUT_PORT,
-        MAX_PORT
-    };
-#endif
 
     struct omx_event
     {
@@ -596,7 +569,6 @@ private:
     OMX_ERRORTYPE set_buffer_req(vdec_allocatorproperty *buffer_prop);
     OMX_ERRORTYPE start_port_reconfig();
     OMX_ERRORTYPE update_picture_resolution();
-	void stream_off();
     void adjust_timestamp(OMX_S64 &act_timestamp);
     void set_frame_rate(OMX_S64 act_timestamp);
     void handle_extradata(OMX_BUFFERHEADERTYPE *p_buf_hdr);
@@ -605,13 +577,10 @@ private:
     void append_interlace_extradata(OMX_OTHER_EXTRADATATYPE *extra,
                                     OMX_U32 interlaced_format_type);
     void append_frame_info_extradata(OMX_OTHER_EXTRADATATYPE *extra,
-                               OMX_U32 num_conceal_mb,
-                               OMX_U32 picture_type,
-                               OMX_S64 timestamp,
-                               OMX_U32 frame_rate,
-                               struct vdec_aspectratioinfo *aspect_ratio_info);
-    void fill_aspect_ratio_info(struct vdec_aspectratioinfo *aspect_ratio_info,
-                                OMX_QCOM_EXTRADATA_FRAMEINFO *frame_info);
+                                     OMX_U32 num_conceal_mb,
+                                     OMX_U32 picture_type,
+                                     OMX_S64 timestamp,
+                                     OMX_U32 frame_rate);
     void append_terminator_extradata(OMX_OTHER_EXTRADATATYPE *extra);
     OMX_ERRORTYPE update_portdef(OMX_PARAM_PORTDEFINITIONTYPE *portDefn);
     void append_portdef_extradata(OMX_OTHER_EXTRADATATYPE *extra);
@@ -625,7 +594,7 @@ private:
 #ifdef USE_ION
     int alloc_map_ion_memory(OMX_U32 buffer_size,
               OMX_U32 alignment, struct ion_allocation_data *alloc_data,
-              struct ion_fd_data *fd_data,int flag);
+              struct ion_fd_data *fd_data);
     void free_ion_memory(struct vdec_ion *buf_ion_info);
 #endif
 
@@ -658,7 +627,7 @@ private:
     {
         if (m_cb.EventHandler && !m_error_propogated)
         {
-            ALOGE("\nERROR: Sending OMX_EventError to Client");
+            DEBUG_PRINT_ERROR("\nERROR: Sending OMX_EventError to Client");
             m_error_propogated = true;
             m_cb.EventHandler(&m_cmp,m_app_data,
                   OMX_EventError,OMX_ErrorHardware,0,NULL);
@@ -824,40 +793,6 @@ private:
     omx_time_stamp_reorder time_stamp_dts;
     desc_buffer_hdr *m_desc_buffer_ptr;
     bool secure_mode;
-    OMX_QCOM_EXTRADATA_FRAMEINFO *m_extradata;
-    bool codec_config_flag;
-#ifdef _MSM8974_
-    int capture_capability;
-    int output_capability;
-    bool streaming[MAX_PORT];
-#endif
 };
-
-#ifdef _MSM8974_
-enum instance_state {
-	MSM_VIDC_CORE_UNINIT_DONE = 0x0001,
-	MSM_VIDC_CORE_INIT,
-	MSM_VIDC_CORE_INIT_DONE,
-	MSM_VIDC_OPEN,
-	MSM_VIDC_OPEN_DONE,
-	MSM_VIDC_LOAD_RESOURCES,
-	MSM_VIDC_LOAD_RESOURCES_DONE,
-	MSM_VIDC_START,
-	MSM_VIDC_START_DONE,
-	MSM_VIDC_STOP,
-	MSM_VIDC_STOP_DONE,
-	MSM_VIDC_RELEASE_RESOURCES,
-	MSM_VIDC_RELEASE_RESOURCES_DONE,
-	MSM_VIDC_CLOSE,
-	MSM_VIDC_CLOSE_DONE,
-	MSM_VIDC_CORE_UNINIT,
-};
-
-enum vidc_resposes_id {
-	MSM_VIDC_DECODER_FLUSH_DONE = 0x11,
-	MSM_VIDC_DECODER_EVENT_CHANGE,
-};
-
-#endif // _MSM8974_
 
 #endif // __OMX_VDEC_H__

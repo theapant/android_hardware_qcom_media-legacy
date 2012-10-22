@@ -30,14 +30,10 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "video_encoder_device.h"
 #include <stdio.h>
 #ifdef _ANDROID_ICS_
-#include <media/hardware/HardwareAPI.h>
+#include "HardwareAPI.h"
 #endif
 #ifdef _ANDROID_
 #include <cutils/properties.h>
-#endif
-#ifndef _ANDROID_
-#include <glib.h>
-#define strlcpy g_strlcpy
 #endif
 /*----------------------------------------------------------------------------
 * Preprocessor Definitions and Constants
@@ -62,7 +58,6 @@ void *get_omx_component_factory_fn(void)
 omx_venc::omx_venc()
 {
 #ifdef _ANDROID_ICS_
-  get_syntaxhdr_enable == false;
   meta_mode_enable = false;
   memset(meta_buffer_hdr,0,sizeof(meta_buffer_hdr));
   memset(meta_buffers,0,sizeof(meta_buffers));
@@ -72,7 +67,6 @@ omx_venc::omx_venc()
 
 omx_venc::~omx_venc()
 {
-  get_syntaxhdr_enable == false;
   //nothing to do
 }
 
@@ -127,14 +121,6 @@ OMX_ERRORTYPE omx_venc::component_init(OMX_STRING role)
     strlcpy((char *)m_cRole, "video_encoder.avc",OMX_MAX_STRINGNAME_SIZE);
     codec_type = OMX_VIDEO_CodingAVC;
   }
-#ifdef _MSM8974_
-  else if(!strncmp((char *)m_nkind, "OMX.qcom.video.encoder.vp8",	\
-                   OMX_MAX_STRINGNAME_SIZE))
-  {
-    strlcpy((char *)m_cRole, "video_encoder.vp8",OMX_MAX_STRINGNAME_SIZE);
-    codec_type = OMX_VIDEO_CodingVPX;
-  }
-#endif
   else
   {
     DEBUG_PRINT_ERROR("\nERROR: Unknown Component\n");
@@ -146,11 +132,8 @@ OMX_ERRORTYPE omx_venc::component_init(OMX_STRING role)
   {
     return eRet;
   }
-#ifdef ENABLE_GET_SYNTAX_HDR
-  get_syntaxhdr_enable = true;
-#endif
 
-  handle = new venc_dev(this);
+  handle = new venc_dev();
 
   if(handle == NULL)
   {
@@ -823,20 +806,6 @@ OMX_ERRORTYPE  omx_venc::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
           eRet =OMX_ErrorUnsupportedSetting;
         }
       }
-#ifdef _MSM8974_
-      else if(!strncmp((char*)m_nkind, "OMX.qcom.video.encoder.vp8",OMX_MAX_STRINGNAME_SIZE))
-      {
-        if(!strncmp((const char*)comp_role->cRole,"video_encoder.vp8",OMX_MAX_STRINGNAME_SIZE))
-        {
-          strlcpy((char*)m_cRole,"video_encoder.vp8",OMX_MAX_STRINGNAME_SIZE);
-        }
-        else
-        {
-          DEBUG_PRINT_ERROR("ERROR: Setparameter: unknown Index %s\n", comp_role->cRole);
-          eRet =OMX_ErrorUnsupportedSetting;
-        }
-      }
-#endif
       else
       {
         DEBUG_PRINT_ERROR("ERROR: Setparameter: unknown param %s\n", m_nkind);
@@ -983,7 +952,8 @@ OMX_ERRORTYPE  omx_venc::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
           }
           meta_mode_enable = pParam->bStoreMetaData;
           if(meta_mode_enable) {
-            m_sInPortDef.nBufferCountActual = 4;
+            m_sInPortDef.nBufferCountActual = 32;
+            m_sInPortDef.nBufferCountMin = 32;
             if(handle->venc_set_param(&m_sInPortDef,OMX_IndexParamPortDefinition) != true)
             {
               DEBUG_PRINT_ERROR("\nERROR: venc_set_param input failed");
@@ -1071,29 +1041,6 @@ OMX_ERRORTYPE  omx_venc::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
       }
       break;
     }
-#ifdef MAX_RES_1080P
-  case OMX_QcomIndexEnableSliceDeliveryMode:
-    {
-      QOMX_EXTNINDEX_PARAMTYPE* pParam =
-         (QOMX_EXTNINDEX_PARAMTYPE*)paramData;
-      if(pParam->nPortIndex == PORT_INDEX_OUT)
-      {
-        if(!handle->venc_set_param(paramData,
-              (OMX_INDEXTYPE)OMX_QcomIndexEnableSliceDeliveryMode))
-        {
-          DEBUG_PRINT_ERROR("ERROR: Request for setting slice delivery mode failed");
-          return OMX_ErrorUnsupportedSetting;
-        }
-      }
-      else
-      {
-        DEBUG_PRINT_ERROR("ERROR: OMX_QcomIndexEnableSliceDeliveryMode "
-           "called on wrong port(%d)", pParam->nPortIndex);
-        return OMX_ErrorBadPortIndex;
-      }
-      break;
-    }
-#endif
   case OMX_IndexParamVideoSliceFMO:
   default:
     {
@@ -1474,19 +1421,9 @@ OMX_U32 omx_venc::dev_resume(void)
   return handle->venc_resume();
 }
 
-OMX_U32 omx_venc::dev_start_done(void)
+bool omx_venc::dev_use_buf(void *buf_addr,unsigned port)
 {
-  return handle->venc_start_done();
-}
-
-OMX_U32 omx_venc::dev_stop_done(void)
-{
-  return handle->venc_stop_done();
-}
-
-bool omx_venc::dev_use_buf(void *buf_addr,unsigned port,unsigned index)
-{
-  return handle->venc_use_buf(buf_addr,port,index);
+  return handle->venc_use_buf(buf_addr,port);
 }
 
 bool omx_venc::dev_free_buf(void *buf_addr,unsigned port)
@@ -1494,40 +1431,16 @@ bool omx_venc::dev_free_buf(void *buf_addr,unsigned port)
   return handle->venc_free_buf(buf_addr,port);
 }
 
-bool omx_venc::dev_empty_buf(void *buffer, void *pmem_data_buf,unsigned index,unsigned fd)
+bool omx_venc::dev_empty_buf(void *buffer, void *pmem_data_buf)
 {
-  return  handle->venc_empty_buf(buffer, pmem_data_buf,index,fd);
+  return  handle->venc_empty_buf(buffer, pmem_data_buf);
 }
 
-bool omx_venc::dev_fill_buf(void *buffer, void *pmem_data_buf,unsigned index,unsigned fd)
+bool omx_venc::dev_fill_buf(void *buffer, void *pmem_data_buf)
 {
-  return handle->venc_fill_buf(buffer, pmem_data_buf,index,fd);
+  return handle->venc_fill_buf(buffer, pmem_data_buf);
 }
 
-bool omx_venc::dev_get_seq_hdr(void *buffer, unsigned size, unsigned *hdrlen)
-{
-  return handle->venc_get_seq_hdr(buffer, size, hdrlen);
-}
-
-bool omx_venc::dev_loaded_start()
-{
-  return handle->venc_loaded_start();
-}
-
-bool omx_venc::dev_loaded_stop()
-{
-  return handle->venc_loaded_stop();
-}
-
-bool omx_venc::dev_loaded_start_done()
-{
-  return handle->venc_loaded_start_done();
-}
-
-bool omx_venc::dev_loaded_stop_done()
-{
-  return handle->venc_loaded_stop_done();
-}
 
 bool omx_venc::dev_get_buf_req(OMX_U32 *min_buff_count,
                                OMX_U32 *actual_buff_count,

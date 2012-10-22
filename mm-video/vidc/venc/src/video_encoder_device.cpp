@@ -142,21 +142,16 @@ FILE *outputBufferFile1;
 char outputfilename [] = "/data/output-bitstream.\0\0\0\0";
 #endif
 //constructor
-venc_dev::venc_dev(class omx_venc *venc_class)
+venc_dev::venc_dev()
 {
   m_max_allowed_bitrate_check = false;
   m_eLevel = 0;
   m_eProfile = 0;
-  pthread_mutex_init(&loaded_start_stop_mlock, NULL);
-  pthread_cond_init (&loaded_start_stop_cond, NULL);
-  DEBUG_PRINT_LOW("venc_dev constructor");
 }
 
 venc_dev::~venc_dev()
 {
-  pthread_cond_destroy(&loaded_start_stop_cond);
-  pthread_mutex_destroy(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("venc_dev distructor");
+  //nothing to do
 }
 
 void* async_venc_message_thread (void *input)
@@ -182,7 +177,7 @@ void* async_venc_message_thread (void *input)
     }
     else if (error_code <0)
     {
-        DEBUG_PRINT_LOW("\nioctl VEN_IOCTL_CMD_READ_NEXT_MSG failed");
+        DEBUG_PRINT_ERROR("\nioctl VEN_IOCTL_CMD_READ_NEXT_MSG failed");
         break;
     }
     else if(omx->async_message_process(input,&venc_msg) < 0)
@@ -377,125 +372,6 @@ bool venc_dev::venc_set_buf_req(unsigned long *min_buff_count,
 
 }
 
-bool venc_dev::venc_loaded_start()
-{
-  struct timespec ts;
-  int status = 0;
-  if(ioctl (m_nDriver_fd,VEN_IOCTL_CMD_START, NULL) < 0)
-  {
-    DEBUG_PRINT_ERROR("ERROR: VEN_IOCTL_CMD_START failed");
-    return false;
-  }
-  if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
-  {
-    DEBUG_PRINT_ERROR("%s: clock_gettime failed", __func__);
-    return false;
-  }
-  ts.tv_sec += 1;
-  pthread_mutex_lock(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("%s: wait on start done", __func__);
-  status = pthread_cond_timedwait(&loaded_start_stop_cond,
-                &loaded_start_stop_mlock, &ts);
-  if (status != 0)
-  {
-    DEBUG_PRINT_ERROR("%s: error status = %d, %s", __func__,
-        status, strerror(status));
-    pthread_mutex_unlock(&loaded_start_stop_mlock);
-    return false;
-  }
-  DEBUG_PRINT_LOW("%s: wait over on start done", __func__);
-  pthread_mutex_unlock(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("%s: venc_loaded_start success", __func__);
-  return true;
-}
-
-bool venc_dev::venc_loaded_stop()
-{
-  struct timespec ts;
-  int status = 0;
-  if(ioctl (m_nDriver_fd,VEN_IOCTL_CMD_STOP, NULL) < 0)
-  {
-    DEBUG_PRINT_ERROR("ERROR: VEN_IOCTL_CMD_STOP failed");
-    return false;
-  }
-  if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
-  {
-    DEBUG_PRINT_ERROR("%s: clock_gettime failed", __func__);
-    return false;
-  }
-  ts.tv_sec += 1;
-  pthread_mutex_lock(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("%s: wait on stop done", __func__);
-  status = pthread_cond_timedwait(&loaded_start_stop_cond,
-                &loaded_start_stop_mlock, &ts);
-  if (status != 0)
-  {
-    DEBUG_PRINT_ERROR("%s: error status = %d, %s", __func__,
-        status, strerror(status));
-    pthread_mutex_unlock(&loaded_start_stop_mlock);
-    return false;
-  }
-  DEBUG_PRINT_LOW("%s: wait over on stop done", __func__);
-  pthread_mutex_unlock(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("%s: venc_loaded_stop success", __func__);
-  return true;
-}
-
-bool venc_dev::venc_loaded_start_done()
-{
-  pthread_mutex_lock(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("%s: signal start done", __func__);
-  pthread_cond_signal(&loaded_start_stop_cond);
-  pthread_mutex_unlock(&loaded_start_stop_mlock);
-  return true;
-}
-
-bool venc_dev::venc_loaded_stop_done()
-{
-  pthread_mutex_lock(&loaded_start_stop_mlock);
-  DEBUG_PRINT_LOW("%s: signal stop done", __func__);
-  pthread_cond_signal(&loaded_start_stop_cond);
-  pthread_mutex_unlock(&loaded_start_stop_mlock);
-  return true;
-}
-
-bool venc_dev::venc_get_seq_hdr(void *buffer,
-    unsigned buffer_size, unsigned *header_len)
-{
-  struct venc_ioctl_msg ioctl_msg = {NULL,NULL};
-  int i = 0;
-  DEBUG_PRINT_HIGH("venc_dev::venc_get_seq_hdr");
-  venc_seqheader seq_in, seq_out;
-  seq_in.hdrlen = 0;
-  seq_in.bufsize = buffer_size;
-  seq_in.hdrbufptr = (unsigned char*)buffer;
-  if (seq_in.hdrbufptr == NULL) {
-    DEBUG_PRINT_ERROR("ERROR: malloc for sequence header failed");
-    return false;
-  }
-  DEBUG_PRINT_LOW("seq_in: buf=%x, sz=%d, hdrlen=%d", seq_in.hdrbufptr,
-    seq_in.bufsize, seq_in.hdrlen);
-
-  ioctl_msg.in = (void*)&seq_in;
-  ioctl_msg.out = (void*)&seq_out;
-  if(ioctl (m_nDriver_fd,VEN_IOCTL_GET_SEQUENCE_HDR,(void*)&ioctl_msg) < 0)
-  {
-    DEBUG_PRINT_ERROR("ERROR: Request for getting sequence header failed");
-    return false;
-  }
-  if (seq_out.hdrlen == 0) {
-    DEBUG_PRINT_ERROR("ERROR: Seq header returned zero length header");
-    DEBUG_PRINT_ERROR("seq_out: buf=%x, sz=%d, hdrlen=%d", seq_out.hdrbufptr,
-      seq_out.bufsize, seq_out.hdrlen);
-    return false;
-  }
-  *header_len = seq_out.hdrlen;
-  DEBUG_PRINT_LOW("seq_out: buf=%x, sz=%d, hdrlen=%d", seq_out.hdrbufptr,
-    seq_out.bufsize, seq_out.hdrlen);
-
-  return true;
-}
-
 bool venc_dev::venc_get_buf_req(unsigned long *min_buff_count,
                                 unsigned long *actual_buff_count,
                                 unsigned long *buff_size,
@@ -554,83 +430,114 @@ bool venc_dev::venc_set_param(void *paramData,OMX_INDEXTYPE index )
       DEBUG_PRINT_LOW("venc_set_param: OMX_IndexParamPortDefinition\n");
       if(portDefn->nPortIndex == PORT_INDEX_IN)
       {
+        if(!venc_set_color_format(portDefn->format.video.eColorFormat))
+        {
+          return false;
+        }
+        if(m_sVenc_cfg.input_height != portDefn->format.video.nFrameHeight ||
+          m_sVenc_cfg.input_width != portDefn->format.video.nFrameWidth)
+        {
+          DEBUG_PRINT_LOW("\n Basic parameter has changed");
+          m_sVenc_cfg.input_height = portDefn->format.video.nFrameHeight;
+          m_sVenc_cfg.input_width = portDefn->format.video.nFrameWidth;
 
+          ioctl_msg.in = (void*)&m_sVenc_cfg;
+          ioctl_msg.out = NULL;
+          if(ioctl (m_nDriver_fd,VEN_IOCTL_SET_BASE_CFG,(void*)&ioctl_msg) < 0)
+          {
+            DEBUG_PRINT_ERROR("\nERROR: Request for setting base config failed");
+            return false;
+          }
+
+          DEBUG_PRINT_LOW("\n Updating the buffer count/size for the new resolution");
+          ioctl_msg.in = NULL;
+          ioctl_msg.out = (void*)&m_sInput_buff_property;
+          if(ioctl (m_nDriver_fd, VEN_IOCTL_GET_INPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0)
+          {
+            DEBUG_PRINT_ERROR("\nERROR: Request for getting i/p bufreq failed");
+            return false;
+          }
+          DEBUG_PRINT_LOW("\n Got updated m_sInput_buff_property values: "
+                      "datasize = %u, maxcount = %u, actualcnt = %u, "
+                      "mincount = %u", m_sInput_buff_property.datasize,
+                      m_sInput_buff_property.maxcount, m_sInput_buff_property.actualcount,
+                      m_sInput_buff_property.mincount);
+
+          ioctl_msg.in = NULL;
+          ioctl_msg.out = (void*)&m_sOutput_buff_property;
+          if(ioctl (m_nDriver_fd, VEN_IOCTL_GET_OUTPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0)
+          {
+            DEBUG_PRINT_ERROR("\nERROR: Request for getting o/p bufreq failed");
+            return false;
+          }
+
+          DEBUG_PRINT_LOW("\n Got updated m_sOutput_buff_property values: "
+                      "datasize = %u, maxcount = %u, actualcnt = %u, "
+                      "mincount = %u", m_sOutput_buff_property.datasize,
+                      m_sOutput_buff_property.maxcount, m_sOutput_buff_property.actualcount,
+                      m_sOutput_buff_property.mincount);
+          ioctl_msg.in = (void*)&m_sOutput_buff_property;
+          ioctl_msg.out = NULL;
+
+          if(ioctl (m_nDriver_fd, VEN_IOCTL_SET_OUTPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0)
+          {
+            DEBUG_PRINT_ERROR("\nERROR: Request for setting o/p bufreq failed");
+            return false;
+          }
+
+          if((portDefn->nBufferCountActual >= m_sInput_buff_property.mincount) &&
+           (portDefn->nBufferCountActual <= m_sInput_buff_property.maxcount))
+          {
+            m_sInput_buff_property.actualcount = portDefn->nBufferCountActual;
+            ioctl_msg.in = (void*)&m_sInput_buff_property;
+            ioctl_msg.out = NULL;
+            if(ioctl(m_nDriver_fd,VEN_IOCTL_SET_INPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0)
+            {
+              DEBUG_PRINT_ERROR("\nERROR: Request for setting i/p buffer requirements failed");
+              return false;
+            }
+          }
+          if(m_sInput_buff_property.datasize != portDefn->nBufferSize)
+          {
+            DEBUG_PRINT_ERROR("\nWARNING: Requested i/p bufsize[%u],"
+                              "Driver's updated i/p bufsize = %u", portDefn->nBufferSize,
+                              m_sInput_buff_property.datasize);
+          }
+          m_level_set = false;
+          if(venc_set_profile_level(0, 0))
+          {
+            DEBUG_PRINT_HIGH("\n %s(): Profile/Level setting success", __func__);
+          }
+        }
+        else
+        {
+          if((portDefn->nBufferCountActual >= m_sInput_buff_property.mincount) &&
+           (m_sInput_buff_property.maxcount >= portDefn->nBufferCountActual) &&
+            (m_sInput_buff_property.datasize == portDefn->nBufferSize))
+          {
+            m_sInput_buff_property.actualcount = portDefn->nBufferCountActual;
+            ioctl_msg.in = (void*)&m_sInput_buff_property;
+            ioctl_msg.out = NULL;
+            if(ioctl (m_nDriver_fd,VEN_IOCTL_SET_INPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0)
+            {
+              DEBUG_PRINT_ERROR("\nERROR: ioctl VEN_IOCTL_SET_INPUT_BUFFER_REQ failed");
+              return false;
+            }
+          }
+          else
+          {
+            DEBUG_PRINT_ERROR("\nERROR: Setting Input buffer requirements failed");
+            return false;
+          }
+        }
+      }
+      else if(portDefn->nPortIndex == PORT_INDEX_OUT)
+      {
         if(!venc_set_encode_framerate(portDefn->format.video.xFramerate, 0))
         {
           return false;
         }
 
-        if(!venc_set_color_format(portDefn->format.video.eColorFormat))
-        {
-          return false;
-        }
-
-        DEBUG_PRINT_LOW("\n Basic parameter has changed");
-        m_sVenc_cfg.input_height = portDefn->format.video.nFrameHeight;
-        m_sVenc_cfg.input_width = portDefn->format.video.nFrameWidth;
-
-        ioctl_msg.in = (void*)&m_sVenc_cfg;
-        ioctl_msg.out = NULL;
-        if(ioctl (m_nDriver_fd,VEN_IOCTL_SET_BASE_CFG,(void*)&ioctl_msg) < 0) {
-            DEBUG_PRINT_ERROR("\nERROR: Request for setting base config failed");
-            return false;
-        }
-
-        DEBUG_PRINT_LOW("\n Updating the buffer count/size for the new resolution");
-        ioctl_msg.in = NULL;
-        ioctl_msg.out = (void*)&m_sInput_buff_property;
-        if(ioctl (m_nDriver_fd, VEN_IOCTL_GET_INPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0) {
-            DEBUG_PRINT_ERROR("\nERROR: Request for getting i/p bufreq failed");
-            return false;
-        }
-        DEBUG_PRINT_LOW("\n Got updated m_sInput_buff_property values: "
-                        "datasize = %u, maxcount = %u, actualcnt = %u, "
-                        "mincount = %u", m_sInput_buff_property.datasize,
-                        m_sInput_buff_property.maxcount, m_sInput_buff_property.actualcount,
-                        m_sInput_buff_property.mincount);
-
-        ioctl_msg.in = NULL;
-        ioctl_msg.out = (void*)&m_sOutput_buff_property;
-        if(ioctl (m_nDriver_fd, VEN_IOCTL_GET_OUTPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0) {
-            DEBUG_PRINT_ERROR("\nERROR: Request for getting o/p bufreq failed");
-            return false;
-        }
-
-        DEBUG_PRINT_LOW("\n Got updated m_sOutput_buff_property values: "
-                        "datasize = %u, maxcount = %u, actualcnt = %u, "
-                        "mincount = %u", m_sOutput_buff_property.datasize,
-                        m_sOutput_buff_property.maxcount, m_sOutput_buff_property.actualcount,
-                        m_sOutput_buff_property.mincount);
-        ioctl_msg.in = (void*)&m_sOutput_buff_property;
-        ioctl_msg.out = NULL;
-
-        if(ioctl (m_nDriver_fd, VEN_IOCTL_SET_OUTPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0) {
-            DEBUG_PRINT_ERROR("\nERROR: Request for setting o/p bufreq failed");
-            return false;
-        }
-
-        if((portDefn->nBufferCountActual >= m_sInput_buff_property.mincount) &&
-           (portDefn->nBufferCountActual <= m_sInput_buff_property.maxcount)) {
-            m_sInput_buff_property.actualcount = portDefn->nBufferCountActual;
-            ioctl_msg.in = (void*)&m_sInput_buff_property;
-            ioctl_msg.out = NULL;
-            if(ioctl(m_nDriver_fd,VEN_IOCTL_SET_INPUT_BUFFER_REQ,(void*)&ioctl_msg) < 0) {
-              DEBUG_PRINT_ERROR("\nERROR: Request for setting i/p buffer requirements failed");
-              return false;
-            }
-        }
-        if(m_sInput_buff_property.datasize != portDefn->nBufferSize) {
-            DEBUG_PRINT_ERROR("\nWARNING: Requested i/p bufsize[%u],"
-                              "Driver's updated i/p bufsize = %u", portDefn->nBufferSize,
-                              m_sInput_buff_property.datasize);
-        }
-        m_level_set = false;
-        if(venc_set_profile_level(0, 0)) {
-          DEBUG_PRINT_HIGH("\n %s(): Profile/Level setting success", __func__);
-        }
-      }
-      else if(portDefn->nPortIndex == PORT_INDEX_OUT)
-      {
         if(!venc_set_target_bitrate(portDefn->format.video.nBitrate, 0))
         {
           return false;
@@ -962,26 +869,6 @@ bool venc_dev::venc_set_param(void *paramData,OMX_INDEXTYPE index )
       }
       break;
     }
-  case OMX_QcomIndexEnableSliceDeliveryMode:
-    {
-       QOMX_EXTNINDEX_PARAMTYPE* pParam =
-          (QOMX_EXTNINDEX_PARAMTYPE*)paramData;
-       if(pParam->nPortIndex == PORT_INDEX_OUT)
-       {
-         if(venc_set_slice_delivery_mode(pParam->bEnable) == false)
-         {
-           DEBUG_PRINT_ERROR("Setting slice delivery mode failed");
-           return OMX_ErrorUnsupportedSetting;
-         }
-       }
-       else
-       {
-         DEBUG_PRINT_ERROR("OMX_QcomIndexEnableSliceDeliveryMode "
-            "called on wrong port(%d)", pParam->nPortIndex);
-         return OMX_ErrorBadPortIndex;
-       }
-       break;
-    }
   case OMX_IndexParamVideoSliceFMO:
   default:
 	  DEBUG_PRINT_ERROR("\nERROR: Unsupported parameter in venc_set_param: %u",
@@ -1123,16 +1010,6 @@ unsigned venc_dev::venc_resume(void)
   return ioctl(m_nDriver_fd,VEN_IOCTL_CMD_RESUME,NULL) ;
 }
 
-unsigned venc_dev::venc_start_done(void)
-{
-  return 0;
-}
-
-unsigned venc_dev::venc_stop_done(void)
-{
-  return 0;
-}
-
 unsigned venc_dev::venc_start(void)
 {
   DEBUG_PRINT_HIGH("\n %s(): Check Profile/Level set in driver before start",
@@ -1221,11 +1098,12 @@ OMX_U32 venc_dev::pmem_allocate(OMX_U32 size, OMX_U32 alignment, OMX_U32 count)
   OMX_U32 width, height;
   void *buf_addr = NULL;
   struct venc_ioctl_msg ioctl_msg;
+  struct pmem_allocation allocation;
   struct venc_recon_addr recon_addr;
   int rc = 0;
 
 #ifdef USE_ION
-  recon_buff[count].ion_device_fd = open (MEM_DEVICE,O_RDONLY);
+  recon_buff[count].ion_device_fd = open (MEM_DEVICE,O_RDONLY|O_DSYNC);
   if(recon_buff[count].ion_device_fd < 0)
   {
       DEBUG_PRINT_ERROR("\nERROR: ION Device open() Failed");
@@ -1233,12 +1111,7 @@ OMX_U32 venc_dev::pmem_allocate(OMX_U32 size, OMX_U32 alignment, OMX_U32 count)
   }
 
   recon_buff[count].alloc_data.len = size;
-#ifdef MAX_RES_720P
-  recon_buff[count].alloc_data.flags = ION_HEAP(MEM_HEAP_ID);
-#else
-  recon_buff[count].alloc_data.flags = (ION_HEAP(MEM_HEAP_ID) |
-                                        ION_HEAP(ION_IOMMU_HEAP_ID));
-#endif
+  recon_buff[count].alloc_data.flags = 0x1 << MEM_HEAP_ID;
   recon_buff[count].alloc_data.align = clip2(alignment);
   if (recon_buff[count].alloc_data.align != 8192)
     recon_buff[count].alloc_data.align = 8192;
@@ -1260,7 +1133,6 @@ OMX_U32 venc_dev::pmem_allocate(OMX_U32 size, OMX_U32 alignment, OMX_U32 count)
   }
   pmem_fd = recon_buff[count].ion_alloc_fd.fd;
 #else
-  struct pmem_allocation allocation;
   pmem_fd = open(MEM_DEVICE, O_RDWR);
 
   if ((int)(pmem_fd) < 0)
@@ -1294,7 +1166,7 @@ OMX_U32 venc_dev::pmem_allocate(OMX_U32 size, OMX_U32 alignment, OMX_U32 count)
 #ifdef USE_ION
     if(ioctl(recon_buff[count].ion_device_fd,ION_IOC_FREE,
        &recon_buff[count].alloc_data.handle)) {
-      DEBUG_PRINT_LOW("ion recon buffer free failed");
+      DEBUG_PRINT_ERROR("ion recon buffer free failed");
     }
     recon_buff[count].alloc_data.handle = NULL;
     recon_buff[count].ion_alloc_fd.fd =-1;
@@ -1352,7 +1224,7 @@ OMX_U32 venc_dev::pmem_free()
 #ifdef USE_ION
       if(ioctl(recon_buff[cnt].ion_device_fd,ION_IOC_FREE,
          &recon_buff[cnt].alloc_data.handle)) {
-        DEBUG_PRINT_LOW("ion recon buffer free failed");
+        DEBUG_PRINT_ERROR("ion recon buffer free failed");
       }
       recon_buff[cnt].alloc_data.handle = NULL;
       recon_buff[cnt].ion_alloc_fd.fd =-1;
@@ -1409,7 +1281,6 @@ unsigned venc_dev::venc_flush( unsigned port)
 
   if(port == PORT_INDEX_IN)
   {
-    DEBUG_PRINT_HIGH("Calling Input Flush");
     buffer_index.flush_mode = VEN_FLUSH_INPUT;
     ioctl_msg.in = (void*)&buffer_index;
     ioctl_msg.out = NULL;
@@ -1418,7 +1289,6 @@ unsigned venc_dev::venc_flush( unsigned port)
   }
   else if(port == PORT_INDEX_OUT)
   {
-    DEBUG_PRINT_HIGH("Calling Output Flush");
     buffer_index.flush_mode = VEN_FLUSH_OUTPUT;
     ioctl_msg.in = (void*)&buffer_index;
     ioctl_msg.out = NULL;
@@ -1433,7 +1303,7 @@ unsigned venc_dev::venc_flush( unsigned port)
 //allocating I/P memory from pmem and register with the device
 
 
-bool venc_dev::venc_use_buf(void *buf_addr, unsigned port,unsigned)
+bool venc_dev::venc_use_buf(void *buf_addr, unsigned port)
 {
   struct venc_ioctl_msg ioctl_msg = {NULL,NULL};
   struct pmem *pmem_tmp;
@@ -1452,22 +1322,6 @@ bool venc_dev::venc_use_buf(void *buf_addr, unsigned port,unsigned)
     dev_buffer.offset = pmem_tmp->offset;
     ioctl_msg.in  = (void*)&dev_buffer;
     ioctl_msg.out = NULL;
-
-    if((m_sVenc_cfg.input_height %16 !=0) || (m_sVenc_cfg.input_width%16 != 0))
-    {
-      unsigned long ht = m_sVenc_cfg.input_height;
-      unsigned long wd = m_sVenc_cfg.input_width;
-      unsigned int luma_size, luma_size_2k;
-
-      ht = (ht + 15) & ~15;
-      wd = (wd + 15) & ~15;
-
-      luma_size = ht * wd;
-      luma_size_2k = (luma_size + 2047) & ~2047;
-
-      dev_buffer.sz =  luma_size_2k + luma_size/2;
-      dev_buffer.maped_size = dev_buffer.sz;
-    }
 
     DEBUG_PRINT_LOW("\n venc_use_buf:pbuffer = %x,fd = %x, offset = %d, maped_size = %d", \
                 dev_buffer.pbuffer, \
@@ -1575,7 +1429,7 @@ bool venc_dev::venc_free_buf(void *buf_addr, unsigned port)
   return true;
 }
 
-bool venc_dev::venc_empty_buf(void *buffer, void *pmem_data_buf,unsigned,unsigned)
+bool venc_dev::venc_empty_buf(void *buffer, void *pmem_data_buf)
 {
   struct venc_buffer frameinfo;
   struct pmem *temp_buffer;
@@ -1624,33 +1478,16 @@ bool venc_dev::venc_empty_buf(void *buffer, void *pmem_data_buf,unsigned,unsigne
 
   int y_size = 0;
   int c_offset = 0;
-  unsigned char *buf_addr = NULL;
 
   y_size = m_sVenc_cfg.input_width * m_sVenc_cfg.input_height;
   //chroma offset is y_size aligned to the 2k boundary
   c_offset= (y_size + 2047) & (~(2047));
 
-  if(pmem_data_buf)
-  {
-    DEBUG_PRINT_LOW("\n Internal PMEM addr for i/p Heap UseBuf: %p", pmem_data_buf);
-    buf_addr = (OMX_U8 *)pmem_data_buf;
-  }
-  else
-  {
-    DEBUG_PRINT_LOW("\n Shared PMEM addr for i/p PMEM UseBuf/AllocateBuf: %p", bufhdr->pBuffer);
-    buf_addr = (unsigned char *)mmap(NULL,
-          ((encoder_media_buffer_type *)bufhdr->pBuffer)->meta_handle->data[2],
-          PROT_READ|PROT_WRITE, MAP_SHARED,
-          ((encoder_media_buffer_type *)bufhdr->pBuffer)->meta_handle->data[0], 0);
-  }
-
   if(inputBufferFile1)
   {
-    fwrite((const char *)buf_addr, y_size, 1,inputBufferFile1);
-    fwrite((const char *)(buf_addr + c_offset), (y_size>>1), 1,inputBufferFile1);
+    fwrite((const char *)frameinfo.ptrbuffer, y_size, 1,inputBufferFile1);
+    fwrite((const char *)(frameinfo.ptrbuffer + c_offset), (y_size>>1), 1,inputBufferFile1);
   }
-
-  munmap (buf_addr, ((encoder_media_buffer_type *)bufhdr->pBuffer)->meta_handle->data[2]);
 #else
   if(inputBufferFile1)
   {
@@ -1659,9 +1496,10 @@ bool venc_dev::venc_empty_buf(void *buffer, void *pmem_data_buf,unsigned,unsigne
 #endif
 
 #endif
+
   return true;
 }
-bool venc_dev::venc_fill_buf(void *buffer, void *pmem_data_buf,unsigned,unsigned)
+bool venc_dev::venc_fill_buf(void *buffer, void *pmem_data_buf)
 {
   struct venc_ioctl_msg ioctl_msg = {NULL,NULL};
   struct pmem *temp_buffer = NULL;
@@ -1700,26 +1538,6 @@ bool venc_dev::venc_fill_buf(void *buffer, void *pmem_data_buf,unsigned,unsigned
     return false;
   }
 
-  return true;
-}
-
-bool venc_dev::venc_set_slice_delivery_mode(OMX_BOOL enable)
-{
-  venc_ioctl_msg ioctl_msg = {NULL,NULL};
-  DEBUG_PRINT_HIGH("Set slice_delivery_mode: %d", enable);
-  if(multislice.mslice_mode == VEN_MSLICE_CNT_MB)
-  {
-    if(ioctl(m_nDriver_fd, VEN_IOCTL_SET_SLICE_DELIVERY_MODE) < 0)
-    {
-      DEBUG_PRINT_ERROR("Request for setting slice delivery mode failed");
-      return false;
-    }
-  }
-  else
-  {
-    DEBUG_PRINT_ERROR("WARNING: slice_mode[%d] is not VEN_MSLICE_CNT_MB to set "
-       "slice delivery mode to the driver.", multislice.mslice_mode);
-  }
   return true;
 }
 
@@ -2325,7 +2143,7 @@ bool venc_dev::venc_set_target_bitrate(OMX_U32 nTargetBitrate, OMX_U32 config)
     m_level_set = false;
     if(venc_set_profile_level(0, 0))
     {
-      DEBUG_PRINT_LOW("Calling set level (Bitrate) with %d\n",profile_level.level);
+      DEBUG_PRINT_HIGH("Calling set level (Bitrate) with %d\n",profile_level.level);
     }
   }
   return true;
@@ -2357,7 +2175,7 @@ bool venc_dev::venc_set_encode_framerate(OMX_U32 encode_framerate, OMX_U32 confi
     m_level_set = false;
     if(venc_set_profile_level(0, 0))
     {
-      DEBUG_PRINT_LOW("Calling set level (Framerate) with %d\n",profile_level.level);
+      DEBUG_PRINT_HIGH("Calling set level (Framerate) with %d\n",profile_level.level);
     }
   }
   return true;
@@ -2826,7 +2644,7 @@ bool venc_dev::venc_validate_profile_level(OMX_U32 *eProfile, OMX_U32 *eLevel)
   {
     *eLevel = new_level;
   }
-  DEBUG_PRINT_LOW("%s: Returning with eProfile = %lu"
+  DEBUG_PRINT_HIGH("%s: Returning with eProfile = %lu"
       "Level = %lu", __func__, *eProfile, *eLevel);
 
   return true;
@@ -2912,7 +2730,7 @@ bool venc_dev::venc_set_meta_mode(bool mode)
 {
   venc_ioctl_msg ioctl_msg = {NULL,NULL};
   ioctl_msg.in = &mode;
-  DEBUG_PRINT_HIGH("Set meta buffer mode: %d", mode);
+
   if(ioctl(m_nDriver_fd,VEN_IOCTL_SET_METABUFFER_MODE,&ioctl_msg) < 0)
   {
     DEBUG_PRINT_ERROR(" Set meta buffer mode failed");

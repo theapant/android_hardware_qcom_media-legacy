@@ -23,6 +23,10 @@ libOmxVdec-def += -DENABLE_DEBUG_HIGH
 libOmxVdec-def += -DENABLE_DEBUG_ERROR
 libOmxVdec-def += -UINPUT_BUFFER_LOG
 libOmxVdec-def += -UOUTPUT_BUFFER_LOG
+ifeq ($(TARGET_BOARD_PLATFORM),msm7x30)
+libOmxVdec-def += -DMAX_RES_720P
+libOmxVdec-def += -UPROCESS_EXTRADATA_IN_OUTPUT_PORT
+endif
 ifeq ($(TARGET_BOARD_PLATFORM),msm8660)
 libOmxVdec-def += -DMAX_RES_1080P
 libOmxVdec-def += -DPROCESS_EXTRADATA_IN_OUTPUT_PORT
@@ -32,18 +36,6 @@ ifeq ($(TARGET_BOARD_PLATFORM),msm8960)
 libOmxVdec-def += -DMAX_RES_1080P
 libOmxVdec-def += -DMAX_RES_1080P_EBI
 libOmxVdec-def += -DPROCESS_EXTRADATA_IN_OUTPUT_PORT
-endif
-ifeq ($(TARGET_BOARD_PLATFORM),msm8974)
-libOmxVdec-def += -DMAX_RES_1080P
-libOmxVdec-def += -DMAX_RES_1080P_EBI
-libOmxVdec-def += -DPROCESS_EXTRADATA_IN_OUTPUT_PORT
-libOmxVdec-def += -D_MSM8974_
-endif
-ifeq ($(TARGET_BOARD_PLATFORM),msm7627a)
-libOmxVdec-def += -DMAX_RES_720P
-endif
-ifeq ($(TARGET_BOARD_PLATFORM),msm7x30)
-libOmxVdec-def += -DMAX_RES_720P
 endif
 
 libOmxVdec-def += -D_ANDROID_ICS_
@@ -59,39 +51,37 @@ endif
 include $(CLEAR_VARS)
 LOCAL_PATH:= $(ROOT_DIR)
 
-libmm-vdec-inc          := bionic/libc/include
-libmm-vdec-inc          += bionic/libstdc++/include
-libmm-vdec-inc          += $(LOCAL_PATH)/inc 
+libmm-vdec-inc          := $(LOCAL_PATH)/inc
 libmm-vdec-inc          += $(OMX_VIDEO_PATH)/vidc/common/inc
-libmm-vdec-inc          += hardware/qcom/media/mm-core/inc
-#libmm-vdec-inc          += bionic/libc/kernel/common/linux
+
+libmm-vdec-inc          += $(TARGET_OUT_HEADERS)/mm-core/omxcore
 #DRM include - Interface which loads the DRM library
 libmm-vdec-inc	        += $(OMX_VIDEO_PATH)/DivxDrmDecrypt/inc
-libmm-vdec-inc          += hardware/qcom/display/libgralloc
-libmm-vdec-inc          += hardware/qcom/display/libgenlock
-libmm-vdec-inc          += frameworks/native/include/media/openmax
-libmm-vdec-inc          += frameworks/native/include/media/hardware
+
+libmm-vdec-inc          += $(TOP)/hardware/qcom/display/libgralloc \
+                        += $(TOP)/hardware/qcom/display/libgenlock
 
 LOCAL_MODULE                    := libOmxVdec
 LOCAL_MODULE_TAGS               := optional
 LOCAL_CFLAGS                    := $(libOmxVdec-def)
-LOCAL_C_INCLUDES                += $(libmm-vdec-inc)
+LOCAL_C_INCLUDES                := $(libmm-vdec-inc)
 
 LOCAL_PRELINK_MODULE    := false
 LOCAL_SHARED_LIBRARIES  := liblog libutils libbinder libcutils
 
-LOCAL_SHARED_LIBRARIES += libgenlock
+LOCAL_SHARED_LIBRARIES  += libgenlock
 LOCAL_SHARED_LIBRARIES  += libdivxdrmdecrypt
 
 LOCAL_SRC_FILES         := src/frameparser.cpp
 LOCAL_SRC_FILES         += src/h264_utils.cpp
 LOCAL_SRC_FILES         += src/ts_parser.cpp
+ifeq ($(TARGET_BOARD_PLATFORM),msm8660)
 LOCAL_SRC_FILES         += src/mp4_utils.cpp
-ifeq ($(TARGET_BOARD_PLATFORM),msm8974)
-LOCAL_SRC_FILES         += src/omx_vdec_msm8974.cpp
-else
-LOCAL_SRC_FILES         += src/omx_vdec.cpp
 endif
+ifeq ($(TARGET_BOARD_PLATFORM),msm8960)
+LOCAL_SRC_FILES         += src/mp4_utils.cpp
+endif
+LOCAL_SRC_FILES         += src/omx_vdec.cpp
 LOCAL_SRC_FILES         += ../common/src/extra_data_handler.cpp
 include $(BUILD_SHARED_LIBRARY)
 
@@ -100,9 +90,8 @@ include $(BUILD_SHARED_LIBRARY)
 # ---------------------------------------------------------------------------------
 include $(CLEAR_VARS)
 
-mm-vdec-test-inc    := hardware/qcom/media/mm-core/inc
+mm-vdec-test-inc    := $(TARGET_OUT_HEADERS)/mm-core/omxcore
 mm-vdec-test-inc    += $(LOCAL_PATH)/inc
-#mm-vdec-test-inc    += bionic/libc/kernel/common/linux
 
 LOCAL_MODULE                    := mm-vdec-omx-test
 LOCAL_MODULE_TAGS               := optional
@@ -122,9 +111,8 @@ include $(BUILD_EXECUTABLE)
 # ---------------------------------------------------------------------------------
 include $(CLEAR_VARS)
 
-mm-vdec-drv-test-inc    := hardware/qcom/media/mm-core/inc
+mm-vdec-drv-test-inc    := $(TARGET_OUT_HEADERS)/mm-core/omxcore
 mm-vdec-drv-test-inc    += $(LOCAL_PATH)/inc
-#mm-vdec-drv-test-inc    += bionic/libc/kernel/common/linux
 
 LOCAL_MODULE                    := mm-video-driver-test
 LOCAL_MODULE_TAGS               := optional

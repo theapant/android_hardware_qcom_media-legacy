@@ -41,9 +41,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C"{
 #include<utils/Log.h>
 }
-#else
-#define ALOGE(fmt, args...) fprintf(stderr, fmt, ##args)
-#endif /* _ANDROID_ */
+#endif
 
 class omx_time_stamp_reorder {
 public:
