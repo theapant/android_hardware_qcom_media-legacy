@@ -2527,6 +2527,10 @@ OMX_ERRORTYPE omx_vdec::get_supported_profile_level_for_720p(OMX_VIDEO_PARAM_PRO
         eRet = OMX_ErrorNoMore;
       }
     }
+    else
+    {
+      eRet = OMX_ErrorNoMore;
+    }
   }
   else
   {
@@ -2617,6 +2621,10 @@ OMX_ERRORTYPE omx_vdec::get_supported_profile_level_for_1080p(OMX_VIDEO_PARAM_PR
         DEBUG_PRINT_ERROR("get_parameter: OMX_IndexParamVideoProfileLevelQuerySupported nProfileIndex ret NoMore %d\n", profileLevelType->nProfileIndex);
         eRet = OMX_ErrorNoMore;
       }
+    }
+    else
+    {
+      eRet = OMX_ErrorNoMore;
     }
   }
   else
