@@ -102,7 +102,7 @@ include $(CLEAR_VARS)
 
 mm-vdec-test-inc    := hardware/qcom/media-legacy/mm-core/inc
 mm-vdec-test-inc    += $(LOCAL_PATH)/inc
-#mm-vdec-test-inc    += bionic/libc/kernel/common/linux
+mm-vdec-test-inc    += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 
 LOCAL_MODULE                    := mm-vdec-omx-test
 LOCAL_MODULE_TAGS               := optional
@@ -124,7 +124,7 @@ include $(CLEAR_VARS)
 
 mm-vdec-drv-test-inc    := hardware/qcom/media-legacy/mm-core/inc
 mm-vdec-drv-test-inc    += $(LOCAL_PATH)/inc
-#mm-vdec-drv-test-inc    += bionic/libc/kernel/common/linux
+mm-vdec-drv-test-inc    += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 
 LOCAL_MODULE                    := mm-video-driver-test
 LOCAL_MODULE_TAGS               := optional
