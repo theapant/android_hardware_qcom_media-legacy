@@ -44,8 +44,8 @@ include $(CLEAR_VARS)
 libmm-venc-inc      := $(LOCAL_PATH)/inc
 libmm-venc-inc      += $(OMX_VIDEO_PATH)/vidc/common/inc
 libmm-venc-inc      += $(TARGET_OUT_HEADERS)/mm-core/omxcore
-libmm-venc-inc      += $(TOP)/hardware/qcom/media/libstagefrighthw
-libmm-venc-inc      += $(TOP)/hardware/qcom/display/libgralloc
+libmm-venc-inc      += $(TOP)/hardware/qcom/media-legacy/libstagefrighthw
+libmm-venc-inc      += $(TOP)/hardware/qcom/display-legacy/libgralloc
 
 LOCAL_MODULE                    := libOmxVenc
 LOCAL_MODULE_TAGS               := optional
@@ -94,9 +94,11 @@ include $(CLEAR_VARS)
 
 venc-test-inc                   += $(LOCAL_PATH)/inc
 
+
 LOCAL_MODULE                    := mm-video-encdrv-test
 LOCAL_MODULE_TAGS               := optional
 LOCAL_C_INCLUDES                := $(venc-test-inc)
+
 LOCAL_PRELINK_MODULE            := false
 
 LOCAL_SRC_FILES                 := test/video_encoder_test.c
