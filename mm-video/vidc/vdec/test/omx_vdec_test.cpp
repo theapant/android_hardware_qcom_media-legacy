@@ -54,7 +54,7 @@ extern "C"{
 }
 #define LOG_TAG "OMX-VDEC-TEST"
 #define DEBUG_PRINT
-#define DEBUG_PRINT_ERROR LOGE
+#define DEBUG_PRINT_ERROR ALOGE
 
 //#define __DEBUG_DIVX__ // Define this macro to print (through logcat)
                          // the kind of frames packed per buffer and
@@ -3184,7 +3184,7 @@ static int Read_Buffer_From_DivX_4_5_6_File(OMX_BUFFERHEADERTYPE  *pBufHdr)
     timeStampLfile += timestampInterval;
 #ifdef __DEBUG_DIVX__
     total_bytes += pBufHdr->nFilledLen;
-    LOGE("[DivX] Packet: Type[%s] Size[%u] TS[%lld] TB[%llx] NFrms[%lld]\n",
+    ALOGE("[DivX] Packet: Type[%s] Size[%u] TS[%lld] TB[%llx] NFrms[%lld]\n",
       pckt_type, pBufHdr->nFilledLen, pBufHdr->nTimeStamp,
 	  total_bytes, total_frames);
 #endif //__DEBUG_DIVX__
@@ -3406,7 +3406,7 @@ int overlay_fb(struct OMX_BUFFERHEADERTYPE *pBufHdr)
     ov_front.id = overlayp->id;
     if (pBufHdr->pPlatformPrivate == NULL)
     {
-        LOGE("overlay_fb: pPlatformPrivate is null");
+        ALOGE("overlay_fb: pPlatformPrivate is null");
         return -1;
     }
     pPMEMInfo  = (OMX_QCOM_PLATFORM_PRIVATE_PMEM_INFO *)
@@ -3415,7 +3415,7 @@ int overlay_fb(struct OMX_BUFFERHEADERTYPE *pBufHdr)
     if (pPMEMInfo == NULL)
     {
 
-        LOGE("overlay_fb: pmem_info is null");
+        ALOGE("overlay_fb: pmem_info is null");
         return -1;
     }
 #if defined(_ANDROID_) && !defined(USE_EGL_IMAGE_TEST_APP) && !defined(USE_EXTERN_PMEM_BUF)
@@ -3881,16 +3881,16 @@ void getFreePmem()
    int pmem_fd = open (PMEM_DEVICE,O_RDWR);
 
    if(pmem_fd < 0) {
-     LOGE("Unable to open pmem device");
+     ALOGE("Unable to open pmem device");
      return;
    }
    struct pmem_freespace fs;
    ret = ioctl(pmem_fd, PMEM_GET_FREE_SPACE, &fs);
    if(ret) {
-     LOGE("IOCTL to query pmem free space failed");
+     ALOGE("IOCTL to query pmem free space failed");
      goto freespace_query_failed;
    }
-   LOGE("Available free space %lx largest chunk %lx\n", fs.total, fs.largest);
+   ALOGE("Available free space %lx largest chunk %lx\n", fs.total, fs.largest);
 freespace_query_failed:
    close(pmem_fd);
 }
